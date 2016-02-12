@@ -77,6 +77,9 @@ int main(int argc, char *argv[])
     send (sockdata, filename, strlen(filename), 0);
 
 
+    int i;
+    char ipkey[] = "()";
+
     while ( (n = read(sockfd, recvBuff, sizeof(recvBuff)-1)) > 0)
     {
         recvBuff[n] = 0;
@@ -88,7 +91,11 @@ int main(int argc, char *argv[])
         //printf("%s", response);
         if (strcmp(response, "227")==0)
         {
-            dataip = strtok(temp, " ");
+            i = strcspn(recvBuff, ipkey);
+            dataip = &recvBuff[strlen(recvBuff) - (strlen(recvBuff)-i)];
+
+            //dataip = strtok(temp, " ");
+            
             printf("%s", dataip);
         }
 
@@ -111,3 +118,5 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+//int ()
