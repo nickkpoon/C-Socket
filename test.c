@@ -9,7 +9,10 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
-//char * convertIP(char *msg);
+    char logfile[100]="";
+    int iflog = 0;
+    int ifstd = 0;
+
 
 int main(int argc, char *argv[])
 {
@@ -28,55 +31,62 @@ int main(int argc, char *argv[])
     char username[100]="USER ";
     char password[100]="PASS ";
     char passive[100]="PASV\n";
-    char type[100]="TYPE A\n";
+    char active[100]="PORT ";
+    char type[100]="TYPE ";
     char fileName[100]="RETR ";
+    char sizeMsg[100]="SIZE ";
     char quit[100]="QUIT\n";
     char localfile[100]="";
 
     char hostname[100] = "";
     int arg;
 
+ 
     int ifname = 0;
     int ifpass = 0;
+    int iftype = 0;
     int ifactive = 0;
     for(arg = 0; arg < argc; ++arg)
     {   
-        if(strcmp(argv[arg], "-h") == 0) //helpfile flag
+        if(strcmp(argv[arg], "-h") == 0 || strcmp(argv[arg], "--help") == 0) //helpfile flag
         {
             printf("USAGE:[-f file] or [--file file]\nSpecifies the file to download.\n[-s hostname] or [--server hostname]\nSpecifies the server to download the file from.\n[-p port] or [--port port]\nSpecifies the port to be used when contacting the server. (default value: 21).\n[-n user] or [--username user]\nUses the username user when logging into the FTP server (default value: anonymous).\n[-P password] or [--password password]\nUses the password password when logging into the FTP server (default value: user@localhost.localnet).\n-a or --active\nForces active behavior (the server opens the data connection to the client) (default behavior: passive behavior).\n[-m mode] or [--mode mode]\nSpecifies the mode to be used for the transfer (ASCII or binary) (default value: binary).\n[-l logfile] or [--log logfile]\n");
             exit(0);
         }
 
-        if(strcmp(argv[arg], "-v") == 0) //version flag
+        if(strcmp(argv[arg], "-v") == 0 || strcmp(argv[arg], "--version") == 0) //version flag
         {
             printf("MFTP\nVersion: 0.1\nBy:Nicholas Poon");
             exit(0);
         }
 
-        if(strcmp(argv[arg], "-f") == 0) //set filename
+        if(strcmp(argv[arg], "-f") == 0 || strcmp(argv[arg], "--file") == 0) //set filename
         {
             strcat(localfile, argv[arg+1]);
 
             strcat(fileName, argv[arg+1]);
             strcat(fileName, "\n");
+
+            strcat(sizeMsg, argv[arg+1]);
+            strcat(sizeMsg, "\n");
             //printf("RETRIEVE::%s\n", fileName);
         }
 
-        if(strcmp(argv[arg], "-s") == 0) //set hostname
+        if(strcmp(argv[arg], "-s") == 0 || strcmp(argv[arg], "--server") ==0) //set hostname
         {
             //printf("%s\n", argv[arg+1]);
             ip_address=argv[arg+1];
 
         }
 
-        if(strcmp(argv[arg], "-p") == 0) //set port number 
+        if(strcmp(argv[arg], "-p") == 0 || strcmp(argv[arg], "--port")==0) //set port number 
         {
             //printf("%s\n", argv[arg+1]);
             port = toInt(argv[arg+1]);
 
         }
 
-        if(strcmp(argv[arg], "-n") == 0)
+        if(strcmp(argv[arg], "-n") == 0 || strcmp(argv[arg], "--username")==0)
         {
             ifname++;
             //printf("%s\n", argv[arg+1]);
@@ -85,7 +95,7 @@ int main(int argc, char *argv[])
 
         }
 
-        if(strcmp(argv[arg], "-n") == 0)
+        if(strcmp(argv[arg], "-P") == 0 || strcmp(argv[arg], "--password")==0)
         {
             ifpass++;
             //printf("%s\n", argv[arg+1]);
@@ -94,10 +104,27 @@ int main(int argc, char *argv[])
 
         }
 
-        if(strcmp(argv[arg], "-a") == 0)
+        if(strcmp(argv[arg], "-a") == 0 || strcmp(argv[arg], "--active")==0)
         {
             ifactive++;
 
+        }
+
+        if(strcmp(argv[arg], "-m") == 0 || strcmp(argv[arg], "--mode")==0)
+        {
+            iftype++;
+            strcat(type, argv[arg+1]);
+            strcat(type, "\n");
+        }
+
+        if(strcmp(argv[arg], "-l") == 0 || strcmp(argv[arg], "--log")==0)
+        {
+            if (strcmp(argv[arg+1], "-")==0)
+                ifstd++;
+            else
+                iflog++;
+
+            strcat(logfile, argv[arg+1]);
         }
 
 
@@ -114,6 +141,11 @@ int main(int argc, char *argv[])
     {
         strcat(password, "user@localhost.localnet\n");
     }
+
+    if (iftype == 0)
+    {
+        strcat(type, "I\n");
+    }
     //return 0;
 
 /*
@@ -127,7 +159,57 @@ int main(int argc, char *argv[])
  
     connectServer(sockfd, ip_address, port);
     
+/*
+ *
+ * * * * * ACTIVE MODE 
+ *
+ */   
+  
+    struct sockaddr_in sin;
+        socklen_t len = sizeof(sin);
+    if (getsockname(sockfd, (struct sockaddr *)&sin, &len) == -1)
+    perror("getsockname");
 
+    int activeport = ntohs(sin.sin_port);
+     /*printf("port number %d\n", activeport);
+     printf("first half = %d\n", activeport/256);
+     printf("second half = %d\n", activeport%256);*/
+    
+    int z;
+    char buf[32];
+    char firstport[32];
+    char secondport[32];
+    struct hostent *he;
+
+
+    char *activeip;
+
+    z = gethostname(buf,sizeof buf);
+
+    if ( z == -1 ) 
+    {
+        fprintf(stderr, "%s: gethostname(2)\n",
+        strerror(errno));
+        exit(1);
+    }
+
+    if ( (he = gethostbyname(buf) ) == NULL ) 
+    {
+      exit(1); 
+    }
+
+    activeip = inet_ntoa(*(struct in_addr *)&he->h_addr);
+    sprintf(firstport, "%d", activeport/256);
+    sprintf(secondport, "%d", activeport%256);
+    strcat (activeip, ".");
+    strcat (activeip, firstport);
+    strcat (activeip, ".");
+    strcat (activeip, secondport);
+
+    strcat (active, activeip);
+    strcat (active, "\n");
+
+    /*printf("%s", active);
 /*
  *
  * * * * * SEND/READ MESSAGES TO FTP SERVER
@@ -160,9 +242,12 @@ int main(int argc, char *argv[])
         lm++;
     }
     
-    printf("%s\n\n\n", localfilename);
+    //printf("%s\n\n\n", localfilename);
     FILE *f = fopen(localfilename, "w+");
+    FILE *logging = fopen(logfile, "w");
+    logging = fopen(logfile, "a+");
 
+    
 
     while ( (n = read(sockfd, recvBuff, sizeof(recvBuff)-1)) > 0)
     {
@@ -170,7 +255,18 @@ int main(int argc, char *argv[])
         strcpy(temp, recvBuff);
         strcpy(temp2, recvBuff);
         response = strtok(temp, " ");
-        printf("%s", recvBuff);
+
+        if(ifstd != 0)
+        {
+            printf("s->c: %s", recvBuff);
+        }
+
+        if(iflog != 0)
+        {
+            fprintf(logging, "s->c: %s", recvBuff);
+
+
+        }
 
         //            printf("%s", response);
         if (strcmp(response, "227")==0)
@@ -180,8 +276,8 @@ int main(int argc, char *argv[])
 
             if((sockdata = createSocket()) < 0)
             {
-                printf("\n Error : Cannot Create Data Socket \n");
-                return -1;
+                printf("%s\n", strerror(errno));;
+                exit(7);
             }
 
             if(startDataSocket(sockdata, dataip)<0)
@@ -191,26 +287,33 @@ int main(int argc, char *argv[])
 
         else if (strcmp(response, "220")==0)
         {
-            sendMessage(sockfd, username);
+            sendMessage(sockfd, username, logging);
         }
 
         else if (strcmp(response, "331")==0)
         {
-            sendMessage(sockfd, password);
+            sendMessage(sockfd, password, logging);
 
         }
 
         else if (strcmp(response, "230")==0)
         {
-            
-            sendMessage(sockfd, passive);
-            sendMessage(sockfd, type);
+            sendMessage(sockfd, type, logging);
+            if (ifactive == 0)
+            sendMessage(sockfd, passive, logging);
+            else
+            sendMessage(sockfd, active, logging);
             
         }
 
         else if (strcmp(response, "200")==0)
         {
-            sendMessage(sockfd, fileName);
+            sendMessage(sockfd, sizeMsg, logging);
+        }
+
+        else if (strcmp(response, "213")==0)
+        {
+            sendMessage(sockfd, fileName, logging);
         }
 
         else if (strcmp(response, "150")==0)
@@ -238,7 +341,7 @@ int main(int argc, char *argv[])
             char recvFile[size + 4];
             //memset(recvFile, 0, 10244);
 
-           printf("\nBeginning File Transfer... of %i bytes\n", sizeof(recvFile));
+           //printf("\nBeginning File Transfer... of %i bytes\n", sizeof(recvFile));
            if (read(sockdata, recvFile, sizeof(recvFile))<0)
             {
                 printf("DATASOCKET READ FAILED!");
@@ -251,7 +354,7 @@ int main(int argc, char *argv[])
 
         else if (strcmp(response, "226")==0)
         {
-            sendMessage(sockfd, quit);
+            sendMessage(sockfd, quit, logging);
             exit(0);
         }        
 
@@ -275,11 +378,11 @@ int main(int argc, char *argv[])
             exit(5);
         }     
     }
-
+    fclose(logging);
     if(n < 0)
     {
-        printf("\n Read error \n");
-        return 0;
+        printf("%s\n", strerror(errno));        
+        exit(7);
     } 
 
     return 0;
@@ -308,7 +411,7 @@ int connectServer(int socket, char *ip, int port)
     n = connect(socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
     if (n < 0)
     {
-        printf("ERROR:%s\n", strerror(errno));
+        printf("%s\n", strerror(errno));
         exit(1);
     }
     return n;
@@ -319,22 +422,35 @@ int createSocket()
     int n = socket(AF_INET, SOCK_STREAM, 0);
     if (n < 0)
     {
-        printf("ERROR:%s\n", strerror(errno));
+        printf("%s\n", strerror(errno));
         exit(7);
 
     }
     return n;
 }
 
-int sendMessage(int socket, char *msg)
+int sendMessage(int socket, char *msg, FILE *logging)
 {
     int n = send(socket , msg , strlen(msg) , 0);
+    //FILE *logging = fopen(logfile, "a+");
     if (n < 0)
     {
-        printf("ERROR:%s\n", strerror(errno));
+        printf("%s\n", strerror(errno));
         exit(7);
 
     }
+
+    if(ifstd != 0)
+    {
+        printf("c->s: %s", msg);
+    }
+
+    if(iflog != 0)
+    {
+        fprintf(logging, "c->s: %s", msg);
+
+    }
+
     return n;
 }
 
@@ -375,16 +491,17 @@ int startDataSocket(int socket, char *msg)
 
     address = ip + 1;
 
-    printf("\n Creating Data Socket... \n");
+    //printf("\n Creating Data Socket... \n");
     //printf("\n portno:%i", port);
     
 
-    printf("\n Connecting Data Socket To Server... \n");
+    //printf("\n Connecting Data Socket To Server... \n");
 
     n = connectServer(socket, address, port);
     if (n < 0)
     {
-        printf("CANNOT CONNECT TO DATA SERVER!");
+        printf("%s\n", strerror(errno));
+        exit(1);
     }    
 
     return n;
