@@ -13,10 +13,10 @@
 
 int main(int argc, char *argv[])
 {
-    argv[0]="2";
-    argv[1]="128.111.24.43"; //my ip
+    //argv[0]="2";
+    //argv[1]="128.111.24.43"; //my ip
 
-    char *ip_address = argv[1];
+    char *ip_address = "";
     int port = 21;
 
     int sockfd = 0, sockdata = 0, n = 0;
@@ -25,84 +25,143 @@ int main(int argc, char *argv[])
     char *response;
     char *dataip;
 
-    char username[100]="USER anonymous\n";
-    char password[100]="PASS user@localhost.localnet\n";
+    char username[100]="USER ";
+    char password[100]="PASS ";
     char passive[100]="PASV\n";
     char type[100]="TYPE A\n";
-    char list[100]="RETR robots.txt\n";
+    char fileName[100]="RETR ";
     char quit[100]="QUIT\n";
+    char localfile[100]="";
+
+    char hostname[100] = "";
+    int arg;
+
+    int ifname = 0;
+    int ifpass = 0;
+    int ifactive = 0;
+    for(arg = 0; arg < argc; ++arg)
+    {   
+        if(strcmp(argv[arg], "-h") == 0) //helpfile flag
+        {
+            printf("USAGE:[-f file] or [--file file]\nSpecifies the file to download.\n[-s hostname] or [--server hostname]\nSpecifies the server to download the file from.\n[-p port] or [--port port]\nSpecifies the port to be used when contacting the server. (default value: 21).\n[-n user] or [--username user]\nUses the username user when logging into the FTP server (default value: anonymous).\n[-P password] or [--password password]\nUses the password password when logging into the FTP server (default value: user@localhost.localnet).\n-a or --active\nForces active behavior (the server opens the data connection to the client) (default behavior: passive behavior).\n[-m mode] or [--mode mode]\nSpecifies the mode to be used for the transfer (ASCII or binary) (default value: binary).\n[-l logfile] or [--log logfile]\n");
+            exit(0);
+        }
+
+        if(strcmp(argv[arg], "-v") == 0) //version flag
+        {
+            printf("MFTP\nVersion: 0.1\nBy:Nicholas Poon");
+            exit(0);
+        }
+
+        if(strcmp(argv[arg], "-f") == 0) //set filename
+        {
+            strcat(localfile, argv[arg+1]);
+
+            strcat(fileName, argv[arg+1]);
+            strcat(fileName, "\n");
+            //printf("RETRIEVE::%s\n", fileName);
+        }
+
+        if(strcmp(argv[arg], "-s") == 0) //set hostname
+        {
+            //printf("%s\n", argv[arg+1]);
+            ip_address=argv[arg+1];
+
+        }
+
+        if(strcmp(argv[arg], "-p") == 0) //set port number 
+        {
+            //printf("%s\n", argv[arg+1]);
+            port = toInt(argv[arg+1]);
+
+        }
+
+        if(strcmp(argv[arg], "-n") == 0)
+        {
+            ifname++;
+            //printf("%s\n", argv[arg+1]);
+            strcat(username, argv[arg+1]);
+            strcat(username, "\n");
+
+        }
+
+        if(strcmp(argv[arg], "-n") == 0)
+        {
+            ifpass++;
+            //printf("%s\n", argv[arg+1]);
+            strcat(password, argv[arg+1]);
+            strcat(password, "\n");
+
+        }
+
+        if(strcmp(argv[arg], "-a") == 0)
+        {
+            ifactive++;
+
+        }
 
 
-
-
-
-    argc=2;
-
-    if(argc != 2)
-    {
-        printf("\n Usage: %s <ip of server> \n",argv[0]);
-        return 1;
+        //printf("Argument %d : %s\n", arg, argv[arg]);
     }
 
-    /*
-     *
-     * * * * * CREATE SOCKET
-     *
-     */
+
+    if (ifname == 0)
+    {
+        strcat(username, "anonymous\n");
+    }
+
+    if (ifpass == 0)
+    {
+        strcat(password, "user@localhost.localnet\n");
+    }
+    //return 0;
+
+/*
+ *
+ * * * * * CREATE CLIENT SOCKET, CONNECT CLIENT TO FTP SERVER
+ *
+ */
+
     memset(recvBuff, '0',sizeof(recvBuff));
     sockfd = createSocket();
-    /*if((sockfd = createSocket()) < 0)
-    {
-        printf("\n Error : Could not create socket \n");
-        return 1;
-    }*/
-         
-    /*
-     *
-     * * * * * CONNECT TO FTP SERVER
-     *
-     */
+ 
+    connectServer(sockfd, ip_address, port);
+    
 
-     connectServer(sockfd, ip_address, port);
-    /*if ( connectServer(sockfd, ip_address, port) < 0)
-    {
-        printf("\n Error : Connect Failed \n");
-        return 1;
-    }*/
-
-    /*
-     *
-     * * * * * LOG IN TO FTP SERVER
-     *
-     */
-    /*if ( send(sockfd , username , strlen(username) , 0) < 0)
-    {
-        perror("send failed");
-        return 1;
-    }
-    else
-    {
-        send(sockfd, password, strlen(password), 0);
-    }
-
-    send (sockfd, passive, strlen(passive), 0);*/
-
-    //sockdata = socket(AF_INET, SOCK_STREAM,0);
-    //send (sockdata, filename, strlen(filename), 0);
-
-    /*
-     *
-     * * * * * READ MESSAGES TO FTP SERVER
-     *
-     */
-
-    int i;
+/*
+ *
+ * * * * * SEND/READ MESSAGES TO FTP SERVER
+ *
+ */
+    int i, j, k, l, size = 1024;
     char ipkey[] = "()";
     char temp[1024] = "";
     char temp2[1024] = "";
-    char recvFile[1000] = "";
+    char fileSize[1024] = "";
+    char localfilename[100] = "";
 
-    FILE *f = fopen("file.txt", "w+");
+    int lm = 0, ao = 0;
+
+    while(localfile[lm] != '\0')
+    {
+        lm++;
+    }
+
+    while(localfile[lm] != '/')
+    {
+        lm--;
+    }
+    lm++;
+
+    while(localfile[lm] != '\0')
+    {
+        localfilename[ao] = localfile[lm];
+        ao++;
+        lm++;
+    }
+    
+    printf("%s\n\n\n", localfilename);
+    FILE *f = fopen(localfilename, "w+");
 
 
     while ( (n = read(sockfd, recvBuff, sizeof(recvBuff)-1)) > 0)
@@ -151,27 +210,43 @@ int main(int argc, char *argv[])
 
         else if (strcmp(response, "200")==0)
         {
-            sendMessage(sockfd, list);
-        }
-
-        else if (strcmp(response, "200")==0)
-        {
-            sendMessage(sockfd, list);
+            sendMessage(sockfd, fileName);
         }
 
         else if (strcmp(response, "150")==0)
         {
+            j = 0;
+            k = 0;
+            l = 0;
 
-            printf("\nBeginning File Transfer...\n");
-            if (read(sockdata, recvFile, sizeof(recvFile)-1)<0)
+            while (temp[j] != ')')
+            {
+                if (k > 0)
+                {
+                    fileSize[l] = temp[j];
+                    l++;
+                }
+
+                if (temp[j] == '(')
+                {
+                    k++;
+                }               
+                j++;
+            }
+
+            size = toInt(fileSize);
+            char recvFile[size + 4];
+            //memset(recvFile, 0, 10244);
+
+           printf("\nBeginning File Transfer... of %i bytes\n", sizeof(recvFile));
+           if (read(sockdata, recvFile, sizeof(recvFile))<0)
             {
                 printf("DATASOCKET READ FAILED!");
                 return -1;
             }
             fprintf(f, "%s", recvFile);
-            printf("%s", recvFile);
+            //printf("%s", recvFile);
             fclose(f);
-           
         }
 
         else if (strcmp(response, "226")==0)
@@ -179,12 +254,6 @@ int main(int argc, char *argv[])
             sendMessage(sockfd, quit);
             exit(0);
         }        
-
-        else if (strcmp(response, "226")==0)
-        {
-            sendMessage(sockfd, quit);
-            exit(0);
-        }   
 
         else if (strcmp(response, "550")==0)
         {
@@ -205,8 +274,6 @@ int main(int argc, char *argv[])
         {
             exit(5);
         }     
-
-        //printf("%s", recvBuff);
     }
 
     if(n < 0)
@@ -218,16 +285,25 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+
+
 int connectServer(int socket, char *ip, int port)
 {
+    struct hostent *he;
     struct sockaddr_in serv_addr;
     int n;
 
     memset(&serv_addr, '0', sizeof(serv_addr));
+    
+    if ( (he = gethostbyname(ip) ) == NULL ) 
+    {
+      exit(1); /* error */
+     } 
 
+    memcpy(&serv_addr.sin_addr, he->h_addr_list[0], he->h_length);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    serv_addr.sin_addr.s_addr = inet_addr(ip);
+    //TO USE FOR IP:: serv_addr.sin_addr.s_addr = inet_addr(ip);
 
     n = connect(socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
     if (n < 0)
@@ -271,10 +347,13 @@ int startDataSocket(int socket, char *msg)
     int i = 0, count = 0, n = 0;
 
     char recvBuff[1024];
-    char filename[100]="LIST\n";
+    char filename[100]="fileName\n";
 
-
-        
+/*
+ *
+ * * * * * CONVERT PASV MESSAGE TO IP ADDRESS
+ *
+ */
     strcpy(ip, msg);
 
     while (ip[i] != '\0')
@@ -308,11 +387,14 @@ int startDataSocket(int socket, char *msg)
         printf("CANNOT CONNECT TO DATA SERVER!");
     }    
 
-    //read(sockdata, recvBuff, sizeof(recvBuff)-1);
     return n;
 }
 
-
+/*
+ *
+ * * * * * CONVERT PASV MESSAGE TO PORT NUMBER
+ *
+ */
 int convertPortNo(char *msg)
 {
     int size = strlen(msg), a = 0, b = 0, port = 0;
@@ -371,8 +453,6 @@ int convertPortNo(char *msg)
     b = toInt(second);
 
     port = (a * 256) + b;
-
-    //printf("THE CONVERTED PORT IS: %i    \n", port);
 
     return port;
 }
